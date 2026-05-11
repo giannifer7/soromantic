@@ -138,6 +138,15 @@ impl MpvClient {
 
         // MPV args
         let mut command = Command::new("mpv");
+
+        // NVIDIA Prime render offload — ensures mpv uses the discrete GPU
+        // on hybrid-graphics laptops. Harmless no-op on non-NVIDIA systems.
+        #[cfg(target_os = "linux")]
+        {
+            command.env("__NV_PRIME_RENDER_OFFLOAD", "1");
+            command.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
+        }
+
         command
             .arg(format!("--input-ipc-server={}", self.socket_path.display()))
             .arg("--idle=yes")
