@@ -1,0 +1,8 @@
+target
+core/target
+egui/target
+dist
+.git
+.env
+**/*.rs.bk
+*.swp

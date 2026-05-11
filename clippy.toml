@@ -1,0 +1,5 @@
+
+# Strict limit on cognitive complexity
+cognitive-complexity-threshold = 15
+# Allow type complexity (generics) to be a bit higher as we use Egui/Tokio
+type-complexity-threshold = 250

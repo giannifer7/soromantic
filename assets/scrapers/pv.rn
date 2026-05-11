@@ -1,0 +1,280 @@
+// PV Scraper in Rune
+// Scrapes video pages from Pissvids/Analvids sites
+// Native modules (http, html, util, progress) are installed in context
+
+/// Main scrape entry point.
+/// Call this with the page URL to scrape.
+pub fn scrape(url) {
+    progress::report("fetch", "Fetching page...");
+    let html_content = http::fetch(url)?;
+    scrape_html(url, html_content)
+}
+
+/// Parse HTML content directly.
+/// Useful for testing or when HTML is already available.
+pub fn scrape_html(url, html_content) {
+    progress::report("parse", "Parsing HTML...");
+    let doc = html::parse(html_content);
+    
+    progress::report("title", "Extracting title...");
+    let title = get_title(doc, " - Pissvids.com")?;
+    
+    progress::report("models", "Extracting models...");
+    let links_data = get_text_with_links(doc)?;
+    let models = links_data.0;
+    let featuring = links_data.1;
+    
+    progress::report("video", "Extracting video data...");
+    let media_data = get_video_data(doc)?;
+    let image = media_data.0;
+    let video_sources = media_data.1;
+    
+    progress::report("studio", "Extracting studio...");
+    let studio = get_studios(doc)?;
+    
+    progress::report("scenes", "Extracting related scenes...");
+    let grid_boxes = extract_all_scenes(doc, url)?;
+    
+    progress::report("done", "Scrape complete");
+
+    let title = match title {
+        Some(t) => t,
+        None => {
+             util::log("Warning: Title not found");
+             "Unknown Title"
+        }
+    };
+
+    Ok(#{
+        url: url,
+        title: title,
+        image: image,
+        preview_url: None,
+        video_sources: video_sources,
+        models: models,
+        featuring: featuring,
+        studio: studio,
+        grid_boxes: grid_boxes,
+    })
+}
+
+/// Alternative entry point for testing
+pub fn main() {
+    // No-op for syntax validation
+    Ok(())
+}
+
+fn get_title(doc, trailer) {
+    let el = match html::query(doc, "title")? {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    
+    let text = el.text; // Removed trim() to test
+    util::log(`Got title text: '${text}'`);
+    if text == "" {
+        util::log("Title text empty");
+        return Ok(None);
+    }
+    
+    let text_len = text.len();
+    let trailer_len = trailer.len();
+
+    if text_len >= trailer_len {
+        let suffix = text[text_len - trailer_len..];
+        if suffix == trailer {
+            let end = text_len - trailer_len;
+            Ok(Some(text[0..end]))
+        } else {
+            Ok(Some(text))
+        }
+    } else {
+        Ok(Some(text))
+    }
+}
+
+fn get_text_with_links(doc) {
+    let models = [];
+    let feats = [];
+    
+    let container = match html::query(doc, ".watch__title")? {
+        Some(e) => e,
+        None => return Ok((models, feats)),
+    };
+    
+    // Re-parse container's outer HTML to select within it
+    let fragment = html::parse(container.outer);
+    for a in html::query_all(fragment, "a")? {
+        let href = match a.attr("href") { Some(h) => h, None => continue };
+        let name = a.text; // Removed trim()
+        util::log(`Found model: '${name}' href: '${href}'`);
+        
+        if href != "" && name != "" {
+        models.push((name, href));
+        }
+    }
+    
+    Ok((models, feats))
+}
+
+fn get_studios(doc) {
+    let div = match html::query(doc, "div.genres-list")? {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    
+    // Re-parse to select within
+    let fragment = html::parse(div.outer);
+    let a = match html::query(fragment, "a")? {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    
+    let href = match a.attr("href") { Some(h) => h, None => return Ok(None) };
+    let name = a.text; // Removed trim()
+    util::log(`Found studio: '${name}'`);
+    
+    if href == "" || name == "" {
+        Ok(None)
+    } else {
+        Ok(Some((name, href)))
+    }
+}
+
+fn get_video_data(doc) {
+    let video = match html::query(doc, "video")? {
+        Some(e) => e,
+        None => return Ok((None, [])),
+    };
+    
+    let image = match video.attr("data-poster") {
+        Some(p) => if p != "" { Some(p) } else { None },
+        None => None,
+    };
+    
+    // Re-parse video element to select sources
+    let fragment = html::parse(video.outer);
+    let sources = [];
+    for source in html::query_all(fragment, "source")? {
+        let src = source.attr("src");
+        let size = source.attr("size");
+        
+        if src.is_some() && size.is_some() {
+            let s_url = src.unwrap();
+            let s_size = size.unwrap();
+            
+            // Parse resolution
+            let res = match s_size.parse::<i64>() { 
+                Ok(v) => v, 
+                Err(_) => continue 
+            };
+            
+            // Map 576p to 480p (non-standard resolution)
+            let res = if res == 576 { 480 } else { res };
+            
+            sources.push(#{
+                url: s_url,
+                resolution: res,
+                duration: None,
+            });
+        }
+    }
+    
+    // Sort by resolution
+    sources.sort_by(|a, b| a.resolution.cmp(b.resolution));
+    
+    Ok((image, sources))
+}
+
+fn extract_all_scenes(doc, base_url) {
+    let scenes = [];
+    let processed = 0;
+    
+    let elements = html::query_all(doc, "div.card-scene")?;
+    let total = elements.len();
+    
+    util::log(`Found ${total} scene elements`);
+    
+    for el in elements {
+        processed += 1;
+        if processed % 5 == 0 || processed == total {
+            progress::report("scenes", `Processing scene ${processed}/${total}...`);
+        }
+        
+        match extract_scene(el, base_url)? {
+            Some(scene) => {
+                scenes.push(scene);
+            },
+            None => {
+                // util::log(`Skipped scene ${processed}`);
+            }
+        }
+    }
+    
+    util::log(`Extracted ${scenes.len()} valid scenes`);
+    Ok(scenes)
+}
+
+fn extract_scene(el, base_url) {
+    // Re-parse element's outer HTML to select within
+    let fragment = html::parse(el.outer);
+    
+    let text_a = html::query(fragment, ".card-scene__text a")?;
+    let view_a = html::query(fragment, ".card-scene__view a")?;
+    let img = html::query(fragment, ".card-scene__view a img")?;
+    
+    let url = match text_a {
+        Some(a) => match a.attr("href") { 
+            Some(h) => util::norm_url(base_url, h), 
+            None => return Ok(None) 
+        },
+        None => return Ok(None),
+    };
+    
+    if url == "" { return Ok(None); }
+    
+    let title = match text_a {
+        Some(a) => a.text, 
+        None => "Unknown".to_string(),
+    };
+    
+    let image = match img {
+        Some(i) => {
+            let src = match i.attr("data-src") {
+                Some(s) => Some(s),
+                None => i.attr("src"),
+            };
+            
+            match src {
+                Some(s) => {
+                    // Filter out video files and data URIs
+                    if s.contains(".mp4") || s.contains(".webm") || s.starts_with("data:") {
+                        None
+                    } else {
+                        // Ensure we have a string
+                        if s == "" { None } else { Some(util::norm_url(base_url, s)) }
+                    }
+                },
+                None => None,
+            }
+        },
+        None => None,
+    };
+
+    let preview_url = match view_a {
+        Some(a) => match a.attr("data-preview") {
+            Some(p) => {
+                if p == "" { None } else { Some(util::norm_url(base_url, p)) }
+            },
+            None => None,
+        },
+        None => None,
+    };
+    
+    Ok(Some(#{
+        title: title,
+        url: url,
+        image: image,
+        preview_url: preview_url,
+    }))
+}

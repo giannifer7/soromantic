@@ -1,0 +1,59 @@
+[package]
+name = "soromantic-core"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.41.1", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
+
+# Database
+sqlx = { version = "0.7", default-features = false, features = ["sqlite", "runtime-tokio", "tls-rustls", "migrate", "macros"] }
+
+# Error handling
+anyhow = "1.0.93"
+libc = "0.2"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Config
+toml = "0.8.23"
+directories = "5.0"
+shellexpand = "3.1"
+
+# HTTP client
+reqwest = { version = "0.11", default-features = false, features = ["json", "stream", "multipart", "rustls-tls"] }
+
+# Async utilities
+futures-util = "0.3"
+async-trait = "0.1"
+
+# HTML parsing
+scraper = "0.22"
+regex = "1"
+url = "2"
+html-escape = "0.2"
+
+image = "0.25.9"
+log = "0.4.29"
+rune = "0.14.1"
+rune-modules = "0.14.1"
+chrono = "0.4.43"
+
+[target.'cfg(windows)'.dependencies]
+interprocess = "1.2"
+
+[dev-dependencies]
+tempfile = "3"

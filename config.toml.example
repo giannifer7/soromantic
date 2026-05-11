@@ -1,0 +1,56 @@
+# Soromantic Configuration Example
+# Copy this file to config.toml to override defaults.
+
+[runtime]
+# Base directory for data.
+# Defaults if unset:
+#   Windows: %LOCALAPPDATA%\soromantic (e.g. C:\Users\Gianni\AppData\Local\soromantic)
+#   Linux: ~/.local/share/soromantic
+#
+# You can override paths explicitly:
+# output_dir = "output"
+# db_path = "output/db/data.db"
+# download_dir = "output/downloads"
+#
+# Specific media directories (default to subdirs of download_dir):
+# cache_dir = "output/downloads/cache"
+# thumbs_dir = "output/downloads/thumbs"
+# covers_dir = "output/downloads/covers"
+# videos_dir = "output/downloads/videos"
+# previews_dir = "output/downloads/previews"
+# previews_dir = "output/downloads/previews"
+#
+# Scrapers directory:
+#   Linux: ~/.local/share/soromantic/assets/scrapers
+#   Windows: %LOCALAPPDATA%\soromantic\assets\scrapers
+# scrapers_dir = "~/.local/share/soromantic/assets/scrapers"
+
+# Path to the list of URLs to scrape
+# batch_list_path = "scraped_urls.txt"
+
+# Paths to binaries (if not in PATH)
+# ffmpeg_binary = "ffmpeg"
+# ffprobe_binary = "ffprobe"
+
+[timeouts]
+mpv_socket_connect = 5.0
+mpv_socket_command = 2.0
+http_request = 5.0
+db_connect = 5.0
+db_busy = 5000        # ms
+db_retry_interval = 1.0
+
+[ui]
+items_per_page = 50
+db_batch_size = 500
+thumbnail_width = 400
+thumbnail_height = 225
+search_limit = 50
+# Texture upload limit per frame (native app). Higher = faster startup, more GPU usage.
+texture_upload_limit_egui = 50
+# Texture upload limit per frame (FLTK wrapper). Lower = safer for single-threaded event loop.
+texture_upload_limit_fltk = 5
+
+[playback]
+# Preferred video resolutions in order of priority (height in pixels)
+video_preferences = [480, 720, 1080]

@@ -1,0 +1,7 @@
+[env]
+# Add virtualenv to PATH (using _.path to prepend securely)
+_.path = ["{{config_root}}/scripts/.venv/bin"]
+# Set VIRTUAL_ENV for tools that check it
+VIRTUAL_ENV = "{{config_root}}/scripts/.venv"
+
+

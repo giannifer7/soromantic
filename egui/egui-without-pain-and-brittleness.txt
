@@ -1,0 +1,351 @@
+egui-without-pain-and-brittleness.txt
+
+I’ll focus on approaches that reduce fragility without abandoning immediate mode.
+
+1. Treat UI as a Pure Projection of State
+
+The biggest source of brittleness in egui apps is mixing logic with drawing.
+
+Instead of:
+
+if ui.button("Delete").clicked() {
+    self.db.delete(self.selected_id.unwrap());
+}
+
+Use a message-based architecture:
+
+enum Msg {
+    DeleteSelected,
+    Rename(String),
+}
+
+UI layer:
+
+if ui.button("Delete").clicked() {
+    msgs.push(Msg::DeleteSelected);
+}
+
+Application layer:
+
+fn update(&mut self, msg: Msg) {
+    match msg {
+        Msg::DeleteSelected => {
+            if let Some(id) = self.selected_id {
+                self.db.delete(id);
+            }
+        }
+        Msg::Rename(name) => { ... }
+    }
+}
+Why this works
+
+UI becomes declarative
+
+Logic is centralized
+
+Easier to test
+
+No hidden mutation in widget callbacks
+
+Much less brittle when refactoring
+
+Think of egui as a renderer, not your application engine.
+
+2. Model UI State Explicitly
+
+A common mistake: relying on egui’s internal memory for everything.
+
+Instead, define your own UI state:
+
+struct UiState {
+    rename_buffer: String,
+    show_settings: bool,
+    selected_tab: Tab,
+}
+
+Then your UI is simply:
+
+ui.checkbox(&mut state.show_settings, "Settings");
+
+This removes hidden coupling and makes behavior predictable.
+
+3. Split UI Into “View Functions”, Not “Widget Chaos”
+
+Bad pattern:
+
+fn ui(&mut self, ui: &mut egui::Ui) {
+    // 500 lines of spaghetti
+}
+
+Better pattern:
+
+fn ui(&mut self, ui: &mut Ui) {
+    self.top_bar(ui);
+    self.sidebar(ui);
+    self.main_panel(ui);
+}
+
+Even better:
+
+fn sidebar(ui: &mut Ui, model: &Model, ui_state: &mut UiState) -> Vec<Msg>
+
+Notice:
+
+Stateless rendering
+
+Explicit inputs
+
+Explicit outputs (messages)
+
+This makes immediate mode feel almost like React — but without runtime cost.
+
+4. Use Stable IDs Intentionally
+
+Many egui bugs come from ID instability.
+
+Bad:
+
+for item in &items {
+    ui.text_edit_singleline(&mut item.name);
+}
+
+Good:
+
+for item in &mut items {
+    ui.push_id(item.id, |ui| {
+        ui.text_edit_singleline(&mut item.name);
+    });
+}
+
+Even better: wrap it:
+
+fn item_row(ui: &mut Ui, item: &mut Item) {
+    ui.push_id(item.id, |ui| {
+        ...
+    });
+}
+
+If IDs are unstable, everything breaks in subtle ways.
+
+5. Separate “Layout Decisions” From “Interaction Decisions”
+
+Immediate mode becomes brittle when layout logic and behavior logic are interwoven.
+
+Instead:
+
+struct LayoutConfig {
+    sidebar_width: f32,
+}
+
+Your layout becomes data-driven:
+
+SidePanel::left("sidebar")
+    .exact_width(layout.sidebar_width)
+    .show(ctx, |ui| {
+        ...
+    });
+
+Now resizing logic doesn’t live inside UI code — it lives in model state.
+
+6. Use Command Queues for Side Effects
+
+Never:
+
+spawn threads
+
+write files
+
+open dialogs
+
+mutate global state
+
+directly inside UI blocks.
+
+Instead:
+
+enum Cmd {
+    SaveFile(PathBuf),
+    SpawnWorker(Task),
+}
+
+Return commands from UI:
+
+Vec<Cmd>
+
+Handle them after frame render.
+
+This makes frame-to-frame behavior deterministic.
+
+7. Build Small Reusable “Micro-Components”
+
+Immediate mode doesn’t give you components — so make your own.
+
+Example:
+
+fn labeled_text_edit(
+    ui: &mut Ui,
+    label: &str,
+    value: &mut String,
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.text_edit_singleline(value)
+    }).inner.changed()
+}
+
+Now reuse everywhere.
+
+This avoids repetition and layout drift.
+
+8. Use Derived View Models
+
+If your model is complex, don’t pass it directly to UI.
+
+Instead:
+
+struct ProjectView {
+    name: String,
+    file_count: usize,
+    is_dirty: bool,
+}
+
+Compute it:
+
+impl From<&Project> for ProjectView { ... }
+
+UI consumes only the view.
+
+This removes coupling and prevents accidental mutation.
+
+9. Embrace Determinism
+
+Immediate mode becomes painful when:
+
+random IDs
+
+order-dependent logic
+
+hidden state
+
+side effects during rendering
+
+If your ui() function is:
+
+pure(state) -> messages
+
+you eliminate 80% of brittleness.
+
+10. If It’s Getting Painful… You Need a State Machine
+
+Complex flows (wizards, editors, async tasks) should be explicit state machines:
+
+enum Screen {
+    Home,
+    Editing(ProjectId),
+    ConfirmDelete(ProjectId),
+}
+
+Instead of:
+
+if self.show_confirm { ... }
+
+State machines prevent “boolean explosion.”
+
+11. Architectural Pattern That Works Extremely Well in egui
+
+Here’s a pattern I’ve seen scale beautifully:
+
+App
+ ├── Model (pure domain)
+ ├── UiState (pure UI)
+ ├── Msg enum
+ ├── Cmd enum
+
+Frame loop:
+
+Render UI → collect Vec<Msg>
+
+Update model with Msg
+
+Produce Vec<Cmd>
+
+Execute commands
+
+Repeat
+
+This keeps immediate mode predictable and pleasant.
+
+12. What Makes egui Feel Brittle?
+
+Common causes:
+
+Hidden egui memory
+
+ID instability
+
+Mutating model directly inside UI
+
+Boolean UI flags everywhere
+
+No separation between state and effects
+
+Remove those, and egui becomes extremely ergonomic.
+
+Bonus: When Immediate Mode Is Actually the Wrong Tool
+
+Immediate mode struggles with:
+
+Extremely deep tree structures
+
+Complex drag/drop with heavy reparenting
+
+Massive virtualized lists
+
+Accessibility-heavy enterprise apps
+
+But for:
+
+Editors
+
+Tools
+
+Dashboards
+
+Internal apps
+
+Dev utilities
+
+It’s fantastic.
+
+If You Want Something Even Cleaner
+
+You might explore architectures inspired by:
+
+Elm architecture
+
+Redux-style reducers
+
+Druid’s data model (but without retained UI)
+
+React hooks (conceptually)
+
+But implemented manually in Rust.
+
+TL;DR
+
+To make egui pleasant:
+
+Treat UI as pure projection
+
+Use Msg/Cmd pattern
+
+Model UI state explicitly
+
+Use stable IDs
+
+Separate side effects
+
+Avoid boolean explosion
+
+Keep UI functions small and composable
+

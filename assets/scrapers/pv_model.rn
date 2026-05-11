@@ -1,0 +1,261 @@
+// PV Model Page Scraper in Rune
+// Scrapes model pages from Pissvids/Analvids sites
+// Native modules (http, html, util, progress) are installed in context
+
+const BASE_URL = "https://pissvids.com";
+
+/// Main entry point - scrape a single model page.
+/// Returns: { info: model_info option, scenes: [], has_next: bool }
+pub fn scrape(url) {
+    scrape_page(url, true)
+}
+
+/// Scrape all pages for a model, following pagination.
+/// Returns: { info: model_info, scenes: [all scenes] }
+pub fn scrape_all(base_url) {
+    progress::report("start", "Starting model scrape...");
+    
+    let page_num = 1;
+    let all_scenes = [];
+    let model_info = None;
+    
+    loop {
+        let url = page_url(base_url, page_num);
+        progress::report("page", "Fetching page...");
+        
+        let is_first = page_num == 1;
+        let result = scrape_page(url, is_first)?;
+        
+        if is_first && result.info.is_some() {
+            model_info = result.info;
+        }
+        
+        for scene in result.scenes {
+            all_scenes.push(scene);
+        }
+        
+        if !result.has_next {
+            break;
+        }
+        page_num += 1;
+    }
+    
+    match model_info {
+        Some(info) => Ok(#{ info: info, scenes: all_scenes }),
+        None => Err("No model info found on page 1"),
+    }
+}
+
+/// Alternative entry point for testing (no Result wrapper for easier Rust access)
+pub fn test_parse(html, url, is_first_page) {
+    let doc = html::parse(html);
+    
+    let info = if is_first_page {
+        progress::report("info", "Extracting model info...");
+        extract_model_info(doc, url)?
+    } else {
+        None
+    };
+    
+    progress::report("scenes", "Extracting scenes...");
+    let scenes = extract_scenes(doc)?;
+    
+    let has_next = has_next_page(doc)?;
+    
+    #{
+        info: info,
+        scenes: scenes,
+        has_next: has_next,
+    }
+}
+
+/// Construct URL for a specific page number.
+fn page_url(base_url, page_num) {
+    if page_num == 1 {
+        base_url
+    } else {
+        format!("{}/{}", base_url, page_num)
+    }
+}
+
+/// Scrape a single page.
+fn scrape_page(url, is_first_page) {
+    let html_content = http::fetch(url)?;
+    
+    progress::report("parse", "Parsing HTML...");
+    let doc = html::parse(html_content);
+    
+    let info = if is_first_page {
+        progress::report("info", "Extracting model info...");
+        extract_model_info(doc, url)?
+    } else {
+        None
+    };
+    
+    progress::report("scenes", "Extracting scenes...");
+    let scenes = extract_scenes(doc)?;
+    
+    let has_next = has_next_page(doc)?;
+    
+    Ok(#{
+        info: info,
+        scenes: scenes,
+        has_next: has_next,
+    })
+}
+
+/// Extract model info from the hero section.
+fn extract_model_info(doc, page_url) {
+    let title_el = match html::query(doc, "h1.model__title")? {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    
+    let name = util::trim(title_el.text);
+    
+    // Hero image
+    let hero_image = match html::query(doc, "div.model__left--photo img")? {
+        Some(e) => e.attr("src"),
+        None => None,
+    };
+    
+    // Flag code from country icon
+    let flag_code = match html::query(doc, "div.model__right img[src*=\"/flags/\"]")? {
+        Some(e) => {
+            match e.attr("src") {
+                Some(src) => util::extract_flag_code(src),
+                None => None,
+            }
+        },
+        None => None,
+    };
+    
+    // Table values
+    let nationality = extract_table_value(doc, "Nationality:")?;
+    let age_str = extract_table_value(doc, "Age:")?;
+    let birth_year = match age_str {
+        Some(s) => util::age_to_birth_year(s),
+        None => None,
+    };
+    let aliases = extract_table_value(doc, "Also known as:")?;
+    
+    Ok(Some(#{
+        name: name,
+        url: page_url,
+        hero_image: hero_image,
+        flag_code: flag_code,
+        nationality: nationality,
+        birth_year: birth_year,
+        aliases: aliases,
+    }))
+}
+
+/// Extract text from a table row with a specific label.
+fn extract_table_value(doc, label) {
+    let rows = html::query_all(doc, "table.model__info tr")?;
+    
+    for row in rows {
+        let first_td = match row.query("td:first-child")? {
+            Some(e) => e,
+            None => continue,
+        };
+        
+        if util::trim(first_td.text) == label {
+            let second_td = match row.query("td:nth-child(2)")? {
+                Some(e) => e,
+                None => continue,
+            };
+            return Ok(Some(util::trim(second_td.text)));
+        }
+    }
+    
+    Ok(None)
+}
+
+/// Extract all scenes from the page.
+fn extract_scenes(doc) {
+    let cards = html::query_all(doc, "div.card-scene")?;
+    let scenes = [];
+    
+    for card in cards {
+        if let Some(scene) = extract_scene(card)? {
+            scenes.push(scene);
+        }
+    }
+    
+    Ok(scenes)
+}
+
+/// Extract a single scene from a card element.
+fn extract_scene(card) {
+    // Get ID from data-content
+    let id = match card.attr("data-content") {
+        Some(i) => i,
+        None => return Ok(None),
+    };
+    
+    // Get link element
+    let link_el = match card.query("div.card-scene__view a")? {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    
+    let url = match link_el.attr("href") {
+        Some(h) => h,
+        None => return Ok(None),
+    };
+    
+    // Thumbnail: try data-src on img, then data-poster on link
+    let img_el = card.query("div.card-scene__view img")?;
+    
+    let thumb = match img_el {
+        Some(img) => {
+            match img.attr("data-src") {
+                Some(s) => Some(util::resolve_url(BASE_URL, s)),
+                None => {
+                    match link_el.attr("data-poster") {
+                        Some(p) => Some(util::resolve_url(BASE_URL, p)),
+                        None => {
+                            match img.attr("data-poster") {
+                                Some(p) => Some(util::resolve_url(BASE_URL, p)),
+                                None => None,
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        None => {
+            match link_el.attr("data-poster") {
+                Some(p) => Some(util::resolve_url(BASE_URL, p)),
+                None => None,
+            }
+        }
+    };
+    
+    // Get preview URL
+    let preview = link_el.attr("data-preview");
+    
+    // Get caption from title attribute
+    let caption = match card.query("div.card-scene__text a")? {
+        Some(e) => match e.attr("title") {
+            Some(t) => t,
+            None => "",
+        },
+        None => "",
+    };
+    
+    Ok(Some(#{
+        id: id,
+        url: util::resolve_url(BASE_URL, url),
+        thumb: thumb,
+        preview: preview,
+        caption: caption,
+    }))
+}
+
+/// Check if there's a next page (pagination).
+fn has_next_page(doc) {
+    let chevron = html::query(doc, "i.bi-chevron-double-right")?;
+    Ok(chevron.is_some())
+}

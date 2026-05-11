@@ -1,0 +1,14 @@
+<Configuration>
+  <VGpu>Default</VGpu>
+  <Networking>Default</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\prj\soromantic</HostFolder>
+      <SandboxFolder>C:\Soromantic</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell -ExecutionPolicy Bypass -Command "start powershell {-NoExit -Command '& C:\Soromantic\windows\install.ps1; Write-Host \"Installation Complete. Launching...\" -ForegroundColor Cyan; & $env:LOCALAPPDATA\Soromantic\soromantic.exe'}"</Command>
+  </LogonCommand>
+</Configuration>
