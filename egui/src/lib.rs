@@ -84,10 +84,22 @@ pub fn run() -> anyhow::Result<()> {
         cfg.batch_list_path = std::path::PathBuf::from(batch_path);
     }
 
-    if std::env::var("RUST_LOG").is_ok() {
-        tracing::info!("Database: {:?}", cfg.db_path);
-        tracing::info!("Downloads: {:?}", cfg.download_dir);
+    tracing::info!("── config paths ──");
+    tracing::info!("  data (download_dir) : {}", cfg.download_dir.display());
+    tracing::info!("  db_path             : {}", cfg.db_path.display());
+    tracing::info!("  cache_dir           : {}", cfg.cache_dir.display());
+    tracing::info!("  frames_dir          : {}", cfg.frames_dir.display());
+    tracing::info!("  previews_dir        : {}", cfg.previews_dir.display());
+    tracing::info!("  thumbs_dir          : {}", cfg.thumbs_dir.display());
+    tracing::info!("  videos_dir          : {}", cfg.videos_dir.display());
+    tracing::info!("  scrapers_dir        : {}", cfg.scrapers_dir.display());
+    tracing::info!("  scripts_dir         : {}", cfg.scripts_dir.display());
+    tracing::info!("  ffmpeg              : {}", cfg.ffmpeg_path.display());
+    tracing::info!("  ffprobe             : {}", cfg.ffprobe_path.display());
+    if let Some(ref orig) = cfg.orig_db_path {
+        tracing::info!("  orig_db_path        : {}", orig.display());
     }
+    tracing::info!("── end config ──");
 
     // Initialize mpv client
     let mpv = Arc::new(MpvClient::new_unix(
@@ -124,6 +136,11 @@ pub fn run() -> anyhow::Result<()> {
     if std::env::var("RUST_LOG").is_ok() {
         tracing::info!("Startup took: {:.2?}", startup_duration);
         tracing::info!("Fast startup: loaded {} items", items.len());
+        let preview_count = items.iter().filter(|i| i.local_preview.is_some()).count();
+        tracing::info!(
+            "Items with preview: {preview_count}/{}",
+            items.len()
+        );
     }
 
     let options = eframe::NativeOptions {
@@ -163,6 +180,8 @@ pub fn run() -> anyhow::Result<()> {
                 db.clone(),
                 cache_dir,
                 cfg.previews_dir.clone(),
+                cfg.frames_dir.clone(),
+                cfg.ffmpeg_path.clone(),
                 &cfg.batch_list_path,
                 event_rx,
                 cfg.ui.clone(),

@@ -301,12 +301,25 @@ fn draw_preview_overlay(
     actions: &RefCell<Vec<GridAction>>,
 ) -> bool {
     let hovered = response.hovered();
-    if hovered
-        && let Some(preview_path) = &item.local_preview
-    {
-        actions.borrow_mut().push(GridAction::RequestPreview(
-            item.id, preview_path.clone(), app.previews_dir.clone(),
-        ));
+    if hovered {
+        if let Some(preview_path) = &item.local_preview {
+            if !app.images.preview_cache.contains_key(&item.id) {
+                tracing::info!(
+                    "[preview] hover id={} preview_path={} frames_dir={}",
+                    item.id,
+                    preview_path,
+                    app.frames_dir.display()
+                );
+            }
+            actions.borrow_mut().push(GridAction::RequestPreview(
+                item.id, preview_path.clone(), app.frames_dir.clone(),
+            ));
+        } else {
+            tracing::info!(
+                "[preview] hover id={} NO local_preview (preview_status != DONE)",
+                item.id
+            );
+        }
     }
 
     if let Some(frames) = app.images.preview_cache.get(&item.id) {

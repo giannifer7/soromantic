@@ -82,7 +82,7 @@ pub async fn download_video_workflow(
     notify_start(on_progress.as_ref(), page_id, *resolution);
 
     if is_hls_url(video_url) {
-        process_hls_download(video_url, &dest_path, page_id, on_progress.as_ref()).await?;
+        process_hls_download(config, video_url, &dest_path, page_id, on_progress.as_ref()).await?;
     } else {
         process_direct_download(video_url, &dest_path, page_id, on_progress.as_ref()).await?;
     }
@@ -174,6 +174,7 @@ fn notify_start(on_progress: Option<&ProgressCallback>, page_id: i64, resolution
 }
 
 async fn process_hls_download(
+    config: &ResolvedConfig,
     video_url: &str,
     dest_path: &Path,
     page_id: i64,
@@ -181,9 +182,9 @@ async fn process_hls_download(
 ) -> Result<()> {
     tracing::info!("Starting HLS download via ffmpeg...");
 
-    // Find ffmpeg (rely on PATH)
-    let ffmpeg_path = Path::new("ffmpeg");
-    let ffprobe_path = Path::new("ffprobe");
+    // Use configured binary paths
+    let ffmpeg_path = &config.ffmpeg_path;
+    let ffprobe_path = &config.ffprobe_path;
 
     // Probe duration for progress (seconds -> microseconds for HLS callback)
     let duration_sec = ffmpeg::probe_duration(ffprobe_path, video_url).await.ok();

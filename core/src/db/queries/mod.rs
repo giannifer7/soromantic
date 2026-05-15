@@ -34,11 +34,20 @@ impl Database {
             None
         };
 
-        let local_preview = if preview_status == crate::constants::status::DONE {
-            Some(self.absolutize_path(&format!(
+        let local_preview = if preview_status == crate::constants::status::DONE
+            || preview_status == crate::constants::status::FRAMES_CACHED
+        {
+            let path = self.absolutize_path(&format!(
                 "previews/{id:0width$}.mp4",
                 width = crate::constants::ui::PAD_WIDTH
-            )))
+            ));
+            tracing::info!(
+                "[preview] id={id} preview_status={preview_status} (DONE/FRAMES_CACHED) path={path}"
+            );
+            Some(path)
+        } else if preview_status != 0 {
+            tracing::info!("[preview] id={id} preview_status={preview_status} (not ready)");
+            None
         } else {
             None
         };

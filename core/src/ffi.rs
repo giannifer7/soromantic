@@ -444,7 +444,8 @@ pub unsafe extern "C" fn soromantic_ensure_previews(
     let frames = crate::previews::ensure_preview_frames(
         id,
         std::path::Path::new(&*file_path),
-        &db.config.cache_dir.join("previews"),
+        &db.config.frames_dir,
+        &db.config.ffmpeg_path,
     );
 
     match frames {

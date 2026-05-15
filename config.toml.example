@@ -1,7 +1,30 @@
 # Soromantic Configuration Example
 # Copy this file to config.toml to override defaults.
 
+# ── Paths section (mirrors rompla's [paths]) ──
+# When `data` is set, all subdirectories derive from it.
+# Individual overrides still take priority.
+# Runtime section below serves as fallback for any unset paths.
+
+# [paths]
+# data = "output"
+# cache = "output/downloads/cache"
+# scrapers = "~/.local/share/soromantic/assets/scrapers"
+# scripts = "~/.local/share/soromantic/assets/scripts"
+# orig_database = "output/db/data.db"
+# database = "output/db/data.db"
+# frames_cache = "output/cache/frames"
+# thumbs = "output/thumbs"
+# covers = "output/covers"
+# videos = "output/videos"
+# previews = "output/previews"
+# models = "output/models"
+# flags = "output/flags"
+
 [runtime]
+# Enable verbose debug output (equivalent to ROMPLA_DEBUG=true).
+# debug = true
+
 # Base directory for data.
 # Defaults if unset:
 #   Windows: %LOCALAPPDATA%\soromantic (e.g. C:\Users\Gianni\AppData\Local\soromantic)
@@ -18,7 +41,8 @@
 # covers_dir = "output/downloads/covers"
 # videos_dir = "output/downloads/videos"
 # previews_dir = "output/downloads/previews"
-# previews_dir = "output/downloads/previews"
+# frames_dir = "output/cache/frames"
+#   Where extracted preview frame images are cached (defaults to cache_dir/frames).
 #
 # Scrapers directory:
 #   Linux: ~/.local/share/soromantic/assets/scrapers
@@ -52,5 +76,11 @@ texture_upload_limit_egui = 50
 texture_upload_limit_fltk = 5
 
 [playback]
-# Preferred video resolutions in order of priority (height in pixels)
+# Preferred video resolutions in order of priority (height in pixels).
 video_preferences = [480, 720, 1080]
+# Seek amount in seconds when using mouse wheel on the seek bar.
+# wheel_seek_amount = 5.0
+# Default volume on startup (0-100).
+# initial_volume = 70.0
+# Volume adjustment step when pressing volume up/down.
+# volume_step = 5.0

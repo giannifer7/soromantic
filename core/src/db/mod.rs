@@ -111,6 +111,7 @@ impl Database {
             (&self.config.covers_dir, "covers"),
             (&self.config.videos_dir, "videos"),
             (&self.config.previews_dir, "previews"),
+            (&self.config.frames_dir, "frames"),
             (&self.config.models_dir, "models"),
             (&self.config.flags_dir, "flags"),
         ];
@@ -162,6 +163,14 @@ impl Database {
             return self
                 .config
                 .previews_dir
+                .join(rest)
+                .to_string_lossy()
+                .to_string();
+        }
+        if let Some(rest) = path.strip_prefix("frames/") {
+            return self
+                .config
+                .frames_dir
                 .join(rest)
                 .to_string_lossy()
                 .to_string();

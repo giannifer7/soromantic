@@ -37,10 +37,10 @@ impl Database {
             -1
         } else {
             sqlx::query_scalar(
-                "SELECT COUNT(*) FROM pages_full p WHERE p.title IS NOT NULL AND p.thumb_status = ? AND p.video_status = ?",
+                "SELECT COUNT(*) FROM pages_full p WHERE p.title IS NOT NULL AND p.thumb_status = ? AND p.video_status >= ?",
             )
             .bind(crate::constants::status::DONE)
-            .bind(crate::constants::status::DONE)
+            .bind(crate::constants::status::PENDING)
             .fetch_one(&self.pool)
             .await?
         };
@@ -49,14 +49,14 @@ impl Database {
         let pages_query = r"
             SELECT p.id, p.title, p.thumb_status, p.preview_status
             FROM pages_full p
-            WHERE p.title IS NOT NULL AND p.thumb_status = ? AND p.video_status = ?
+            WHERE p.title IS NOT NULL AND p.thumb_status = ? AND p.video_status >= ?
             ORDER BY p.id DESC
             LIMIT ? OFFSET ?
         ";
 
         let rows: Vec<sqlx::sqlite::SqliteRow> = sqlx::query(pages_query)
             .bind(crate::constants::status::DONE)
-            .bind(crate::constants::status::DONE)
+            .bind(crate::constants::status::PENDING)
             .bind(limit)
             .bind(offset)
             .fetch_all(&self.pool)
@@ -299,7 +299,7 @@ impl Database {
                     WHERE vs.page_id = p.id AND vs.status = ?) as finished_videos,
                    (CASE WHEN p.video_status = ? THEN 1 ELSE 0 END) as failed_videos
             FROM pages_full p
-            WHERE p.title LIKE ? AND p.video_status = ?
+            WHERE p.title LIKE ? AND p.video_status >= ?
             ORDER BY p.id DESC
             LIMIT ?
             ",
@@ -307,7 +307,7 @@ impl Database {
         .bind(crate::constants::status::DONE)
         .bind(crate::constants::status::ERROR)
         .bind(pattern)
-        .bind(crate::constants::status::DONE)
+        .bind(crate::constants::status::PENDING)
         .bind(limit)
         .fetch(&self.pool);
 

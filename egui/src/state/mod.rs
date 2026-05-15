@@ -134,6 +134,8 @@ pub struct MyApp {
     pub db: Arc<Database>,
     pub cache_dir: PathBuf,
     pub previews_dir: PathBuf,
+    pub frames_dir: PathBuf,
+    pub ffmpeg_path: PathBuf,
     pub batch_list_path: PathBuf,
     pub ui_config: soromantic_core::config::UIConfig,
     pub playback_config: soromantic_core::config::PlaybackConfig,

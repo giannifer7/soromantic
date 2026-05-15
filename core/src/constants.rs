@@ -7,6 +7,8 @@ pub mod status {
     pub const DOWNLOADING: i64 = 2;
     pub const DONE: i64 = 3;
     pub const ERROR: i64 = 4;
+    /// Preview .mp4 downloaded AND JPEG frames already extracted (rompla's statusFramesCached)
+    pub const FRAMES_CACHED: i64 = 5;
 }
 
 /// Media processing constants

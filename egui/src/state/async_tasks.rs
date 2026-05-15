@@ -138,14 +138,19 @@ impl MyApp {
         }
 
         for img in pending {
-            tracing::debug!("Processing pending image for id {}", img.id);
             // Check for sentinel (completion signal)
             if img.image.width() == 0 {
                 if let Some(frames) = self.images.preview_cache.get_mut(&img.id) {
                     frames.ready = true;
+                    tracing::info!(
+                        "[preview] id={} sentinel received, {} frames ready",
+                        img.id,
+                        frames.frames.len()
+                    );
                 }
                 continue;
             }
+            tracing::debug!("Processing pending image for id {} (preview={})", img.id, img.is_preview);
 
             let texture = ctx.load_texture(
                 if img.is_preview {
@@ -190,8 +195,14 @@ impl MyApp {
         runtime_dir: PathBuf,
     ) {
         if self.images.preview_cache.contains_key(&id) {
+            tracing::debug!("[preview] id={id} already in cache, skipping");
             return;
         }
+
+        tracing::info!(
+            "[preview] id={id} requesting frames: video={preview_url} runtime_dir={}",
+            runtime_dir.display()
+        );
 
         // Mark as started
         self.images.preview_cache.insert(id, PreviewFrames::default());
@@ -200,9 +211,11 @@ impl MyApp {
 
         let file_path = PathBuf::from(preview_url); // It's already a local path from the DB query alias
 
+        let ffmpeg_path = self.ffmpeg_path.clone();
+
         self.rt_handle.spawn_blocking(move || {
             let frames =
-                soromantic_core::previews::ensure_preview_frames(id, &file_path, &runtime_dir);
+                soromantic_core::previews::ensure_preview_frames(id, &file_path, &runtime_dir, &ffmpeg_path);
 
             match frames {
                 Ok(paths) => {
